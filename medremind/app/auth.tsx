@@ -5,17 +5,55 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { LinearGradient } from "expo-linear-gradient";
 import * as LocalAuthentication from "expo-local-authentication";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 
 const { width } = Dimensions.get("window");
 
 const Auth = () => {
   const [hasBiometrics, setHasBiometrics] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  const checkBiometrics = async () => {
+    const hasHardware = await LocalAuthentication.hasHardwareAsync();
+    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+    setHasBiometrics(hasBiometrics && isEnrolled);
+  };
+
+  useEffect(() => {
+    checkBiometrics();
+  }, []);
+
+  const authenticate = async () => {
+    try {
+      setIsAuthenticating(true);
+      setError(null);
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      const supportedTypes =
+        await LocalAuthentication.supportedAuthenticationTypesAsync;
+      // CHECK suppported types
+      const auth = await LocalAuthentication.authenticateAsync({
+        promptMessage:
+          hasHardware && isEnrolled
+            ? "Use face ID/TouchID"
+            : "Enter your PIN to access your medications",
+        fallbackLabel: "Use Pin",
+        cancelLabel: "Cancel",
+        disableDeviceFallback: false,
+      });
+      if (auth.success) {
+        router.replace("/");
+      } else {
+        setError("Authentication Failed: Please try again later");
+      }
+    } catch (error) {}
+  };
   return (
     <LinearGradient colors={["#4caf50", "#2e7d32"]} style={styles.container}>
       <View style={styles.content}>
@@ -33,7 +71,7 @@ const Auth = () => {
           </Text>
           <TouchableOpacity
             style={[styles.button, isAuthenticating && styles.buttonDisabled]}
-            // onPress={authenticated}
+            onPress={authenticate}
             disabled={isAuthenticating}
           >
             <Ionicons
